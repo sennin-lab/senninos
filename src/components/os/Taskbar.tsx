@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Wifi, Volume2, Battery, ChevronUp, User, Power } from 'lucide-react';
+import { Search, Wifi, Volume2, Battery, ChevronUp, User, Power, Sun, Moon, Bluetooth, Plane, Settings2 } from 'lucide-react';
 import SenniLogo from '@/components/os/SenniLogo';
 import type { AppDefinition } from '@/components/os/appRegistry';
 import type { WindowState } from '@/hooks/useWindowManager';
@@ -13,11 +13,20 @@ interface TaskbarProps {
   onMinimize: (id: string) => void;
   onSignOut: () => void;
   userName?: string;
+  theme: 'dark' | 'light';
+  onThemeChange: (theme: 'dark' | 'light') => void;
 }
 
-export default function Taskbar({ windows, apps, onOpenApp, onFocusWindow, onMinimize, onSignOut, userName }: TaskbarProps) {
+export default function Taskbar({ windows, apps, onOpenApp, onFocusWindow, onMinimize, onSignOut, userName, theme, onThemeChange }: TaskbarProps) {
   const [startOpen, setStartOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [controlOpen, setControlOpen] = useState(false);
+  const [wifiOn, setWifiOn] = useState(true);
+  const [bluetoothOn, setBluetoothOn] = useState(false);
+  const [airplaneOn, setAirplaneOn] = useState(false);
+  const [volume, setVolume] = useState(75);
+  const changeVolume = (value: number) => { setVolume(value); window.dispatchEvent(new CustomEvent('senninos-volume-change', { detail: value / 100 })); };
+  const [brightness, setBrightness] = useState(85);
   const [time, setTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
   const startRef = useRef<HTMLDivElement>(null);
@@ -31,8 +40,9 @@ export default function Taskbar({ windows, apps, onOpenApp, onFocusWindow, onMin
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (startRef.current?.contains(target) || startButtonRef.current?.contains(target)) return;
+      if (startRef.current?.contains(target) || startButtonRef.current?.contains(target) || (target as HTMLElement).closest?.('[data-control-panel]')) return;
       setStartOpen(false);
+      setControlOpen(false);
     };
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
@@ -133,6 +143,20 @@ export default function Taskbar({ windows, apps, onOpenApp, onFocusWindow, onMin
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {controlOpen && <motion.div data-control-panel initial={{opacity:0,y:18,scale:.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:14,scale:.97}} transition={{type:'spring',damping:24,stiffness:280}} className="fixed right-2 bottom-14 z-[10002] w-[min(340px,calc(100vw-1rem))] rounded-2xl border border-border p-4 shadow-2xl" style={{background:'hsl(var(--window-bg) / .96)',backdropFilter:'blur(28px)'}}>
+          <div className="flex items-center justify-between mb-3"><div><p className="text-sm font-semibold text-foreground">コントロールパネル</p><p className="text-[10px] text-muted-foreground">クイック設定</p></div><button onClick={() => {setControlOpen(false);onOpenApp('settings');}} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground" aria-label="設定を開く"><Settings2 size={16}/></button></div>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setWifiOn(v=>!v)} className={`p-3 rounded-xl flex items-center gap-2 text-xs ${wifiOn?'bg-primary text-primary-foreground':'bg-secondary text-foreground'}`}><Wifi size={16}/>Wi-Fi <span className="ml-auto">{wifiOn?'オン':'オフ'}</span></button>
+            <button onClick={() => setBluetoothOn(v=>!v)} className={`p-3 rounded-xl flex items-center gap-2 text-xs ${bluetoothOn?'bg-primary text-primary-foreground':'bg-secondary text-foreground'}`}><Bluetooth size={16}/>Bluetooth <span className="ml-auto">{bluetoothOn?'オン':'オフ'}</span></button>
+            <button onClick={() => setAirplaneOn(v=>!v)} className={`p-3 rounded-xl flex items-center gap-2 text-xs ${airplaneOn?'bg-primary text-primary-foreground':'bg-secondary text-foreground'}`}><Plane size={16}/>機内モード <span className="ml-auto">{airplaneOn?'オン':'オフ'}</span></button>
+            <button onClick={() => onThemeChange(theme==='dark'?'light':'dark')} className="p-3 rounded-xl bg-secondary text-foreground flex items-center gap-2 text-xs">{theme==='dark'?<Moon size={16}/>:<Sun size={16}/>} {theme==='dark'?'ダーク':'ライト'}モード</button>
+          </div>
+          <div className="mt-4 space-y-3"><div><div className="flex justify-between text-[11px] text-muted-foreground mb-1"><span className="flex items-center gap-1"><Volume2 size={13}/>音量</span><span>{volume}%</span></div><input aria-label="音量" type="range" min="0" max="100" value={volume} onChange={e=>changeVolume(Number(e.target.value))} className="w-full accent-primary"/></div><div><div className="flex justify-between text-[11px] text-muted-foreground mb-1"><span className="flex items-center gap-1"><Sun size={13}/>明るさ</span><span>{brightness}%</span></div><input aria-label="明るさ" type="range" min="20" max="100" value={brightness} onChange={e=>setBrightness(Number(e.target.value))} className="w-full accent-primary"/></div></div>
+          <div className="mt-4 pt-3 border-t border-border flex items-center justify-between"><div><p className="text-xs font-medium text-foreground">{timeStr}</p><p className="text-[10px] text-muted-foreground">{time.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'})}</p></div><button onClick={()=>{setControlOpen(false);onOpenApp('calendar');}} className="text-xs text-primary hover:underline">カレンダー</button></div>
+        </motion.div>}
+      </AnimatePresence>
+
       <div className="fixed bottom-0 left-0 right-0 h-11 bg-taskbar-bg border-t border-border z-[10000] flex items-center px-2 pb-[env(safe-area-inset-bottom)]">
         <button
           ref={startButtonRef}
@@ -174,10 +198,10 @@ export default function Taskbar({ windows, apps, onOpenApp, onFocusWindow, onMin
           <Wifi size={14} className="hidden sm:block" />
           <Volume2 size={14} className="hidden sm:block" />
           <Battery size={14} className="hidden sm:block" />
-          <div className="text-right leading-tight">
+          <button type="button" aria-label="コントロールパネルを開く" onClick={() => {setControlOpen(v=>!v);setStartOpen(false);}} className={`text-right leading-tight px-2 py-1 rounded-md hover:bg-secondary/70 ${controlOpen?'bg-secondary':''}`}>
             <div>{timeStr}</div>
             <div className="text-[10px]">{dateStr}</div>
-          </div>
+          </button>
         </div>
       </div>
     </>

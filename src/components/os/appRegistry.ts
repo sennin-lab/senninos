@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Calculator, CalendarDays, Clock, FileSpreadsheet, FileText, FolderOpen, Globe, Monitor, Palette,
-  Presentation, Settings, Store, Terminal,
+  Presentation, Settings, Store, Terminal, Music,
 } from 'lucide-react';
 
 export interface AppDefinition {
@@ -27,6 +27,7 @@ export const appDefinitions: AppDefinition[] = [
   { id: 'clock', label: '時計', icon: Clock, size: [360, 480], placement: 'store' },
   { id: 'calendar', label: 'カレンダー', icon: CalendarDays, size: [420, 470], placement: 'store' },
   { id: 'paint', label: 'ペイント', icon: Palette, size: [800, 560], placement: 'store' },
+  { id: 'music', label: '音楽プレイヤー', icon: Music, size: [620, 520], placement: 'pinned' },
 ];
 
 export const getAppDefinition = (appId: string): AppDefinition | undefined =>

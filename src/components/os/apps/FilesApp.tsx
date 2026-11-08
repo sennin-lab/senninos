@@ -20,7 +20,9 @@ const quickAccess = [
 function getFileIcon(node: FSNode) {
   if (node.type === 'folder') return <Folder size={18} className="text-warning" />;
   const ext = node.name.split('.').pop()?.toLowerCase() ?? '';
-  if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'bmp', 'webp'].includes(ext)) return <Image size={18} className="text-accent" />;
+  if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'bmp', 'webp', 'avif'].includes(ext)) return <Image size={18} className="text-accent" />;
+  if (ext === 'sdoc') return <FileText size={18} className="text-primary" />;
+  if (['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json', 'py', 'java', 'cpp', 'md', 'sql'].includes(ext)) return <FileText size={18} className="text-success" />;
   if (['mp3', 'wav', 'ogg'].includes(ext)) return <Music size={18} className="text-success" />;
   if (['mp4', 'avi', 'mkv', 'webm'].includes(ext)) return <Video size={18} className="text-primary" />;
   return <FileText size={18} className="text-muted-foreground" />;
@@ -28,7 +30,7 @@ function getFileIcon(node: FSNode) {
 
 const joinPath = (folder: string, name: string) => (folder === '/' ? `/${name}` : `${folder}/${name}`);
 
-export default function FilesApp({ vfs }: { vfs: VFS }) {
+export default function FilesApp({ vfs, onOpenFile }: { vfs: VFS; onOpenFile: (path: string, name: string) => void }) {
   const [search, setSearch] = useState('');
   const [historyStack, setHistoryStack] = useState<string[]>([HOME_DIR]);
   const [historyIdx, setHistoryIdx] = useState(0);
@@ -68,7 +70,7 @@ export default function FilesApp({ vfs }: { vfs: VFS }) {
 
   const openItem = (item: FSNode) => {
     if (item.type === 'folder') navigateTo(joinPath(currentPath, item.name));
-    else toast.message(`${item.name} (${formatSize(item.size)})`);
+    else onOpenFile(joinPath(currentPath, item.name), item.name);
   };
 
   const handleItemClick = (item: FSNode) => {

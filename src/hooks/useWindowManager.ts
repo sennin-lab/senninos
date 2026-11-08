@@ -27,7 +27,7 @@ export function useWindowManager() {
       const existing = prev.find(w => w.appId === appId);
       if (existing) {
         nextZIndex += 1;
-        return prev.map(w => (w.id === existing.id ? { ...w, isMinimized: false, zIndex: nextZIndex } : w));
+        return prev.map(w => (w.id === existing.id ? { ...w, title, width, height, isMinimized: false, zIndex: nextZIndex } : w));
       }
       const offset = (prev.length % 8) * 30;
       nextZIndex += 1;

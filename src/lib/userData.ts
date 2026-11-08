@@ -4,9 +4,10 @@ import type { FSNode } from '@/lib/fs';
 export interface UserSettings {
   wallpaperId: string;
   installedApps: string[];
+  theme: 'dark' | 'light';
 }
 
-export const defaultSettings: UserSettings = { wallpaperId: 'mountain', installedApps: [] };
+export const defaultSettings: UserSettings = { wallpaperId: 'mountain', installedApps: [], theme: 'dark' };
 
 const treeKey = (userId: string) => `senninos-fs:${userId}`;
 const settingsKey = (userId: string) => `senninos-settings:${userId}`;
@@ -44,6 +45,7 @@ export function loadSettings(userId: string): UserSettings {
   return {
     wallpaperId: typeof stored?.wallpaperId === 'string' ? stored.wallpaperId : defaultSettings.wallpaperId,
     installedApps: Array.isArray(stored?.installedApps) ? stored.installedApps : defaultSettings.installedApps,
+    theme: stored?.theme === 'light' ? 'light' : 'dark',
   };
 }
 
