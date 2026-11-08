@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 8%;
+    --foreground: 220 20% 95%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 220 20% 95%;
+
+    --popover: 220 20% 10%;
+    --popover-foreground: 220 20% 95%;
+
+    --primary: 210 100% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 16%;
+    --secondary-foreground: 220 20% 90%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 280 60% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 210 100% 56%;
+
+    --radius: 0.75rem;
+
+    --glass: 220 20% 12%;
+    --glass-border: 220 15% 25%;
+    --glass-highlight: 220 20% 100%;
+
+    --dock-bg: 220 20% 8%;
+    --window-bg: 220 20% 10%;
+    --window-header: 220 20% 14%;
+    --taskbar-bg: 220 20% 6%;
+
+    --success: 142 60% 45%;
+    --warning: 38 92% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Segoe UI', 'Yu Gothic UI', system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: hsl(var(--glass) / 0.75);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid hsl(var(--glass-border) / 0.4);
+  }
+
+  .glass-heavy {
+    background: hsl(var(--glass) / 0.9);
+    backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid hsl(var(--glass-border) / 0.5);
+  }
+
+  .glass-light {
+    background: hsl(var(--glass) / 0.5);
+    backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid hsl(var(--glass-border) / 0.3);
+  }
+
+  .window-shadow {
+    box-shadow: 
+      0 25px 60px -12px hsl(0 0% 0% / 0.5),
+      0 0 0 1px hsl(var(--glass-border) / 0.2);
+  }
+
+  .dock-shadow {
+    box-shadow:
+      0 8px 32px hsl(0 0% 0% / 0.4),
+      inset 0 1px 0 hsl(var(--glass-highlight) / 0.05);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px hsl(var(--primary) / 0.5);
+  }
+  .lock-text-shadow { text-shadow: 0 2px 20px hsl(var(--background) / 0.7); }
+}
