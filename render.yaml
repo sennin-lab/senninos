@@ -8,10 +8,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      - key: VITE_SUPABASE_URL
-        sync: false
-      - key: VITE_SUPABASE_PUBLISHABLE_KEY
-        sync: false
     headers:
       - path: /*
         name: X-Content-Type-Options

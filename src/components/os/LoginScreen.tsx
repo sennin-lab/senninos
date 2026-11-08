@@ -31,15 +31,7 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
     setLoading(true); setError('');
     try {
       const { error } = await (isSignUp ? onSignUp : onLogin)(username, password);
-      if (error) {
-        const messages: Record<string, string> = {
-          'Invalid login credentials': 'ユーザー名またはパスワードが正しくありません',
-          'User already registered': 'このユーザー名は既に使用されています',
-          'Email not confirmed': 'アカウント設定を確認してください',
-          'Failed to fetch': '接続できません。しばらくしてからもう一度お試しください',
-        };
-        setError(messages[error.message] || error.message);
-      }
+      if (error) setError(error.message);
     } catch { setError('接続できません。もう一度お試しください'); }
     finally { setLoading(false); }
   };
