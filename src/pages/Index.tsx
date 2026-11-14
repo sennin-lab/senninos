@@ -1,23 +1,16 @@
 import { useAuth } from '@/hooks/useAuth';
 import LoginScreen from '@/components/os/LoginScreen';
-import Desktop from '@/components/os/Desktop';
+import AccountSession from '@/components/os/AccountSession';
+import BootScreen from '@/components/os/BootScreen';
 
 const Index = () => {
-  const { user, signIn, signUp, signOut } = useAuth();
+  const { status, user, signIn, signUp, signOut } = useAuth();
 
-  if (!user) {
-    return <LoginScreen onLogin={signIn} onSignUp={signUp} />;
-  }
+  if (status === 'loading') return <BootScreen />;
+  if (!user) return <LoginScreen onLogin={signIn} onSignUp={signUp} />;
 
-  // userId を key にして、ユーザーが変わったらデスクトップを作り直す
-  return (
-    <Desktop
-      key={user.id}
-      onSignOut={signOut}
-      userName={user.username}
-      userId={user.id}
-    />
-  );
+  // user.id を key にして、アカウントが変わったらデータとデスクトップを作り直す
+  return <AccountSession key={user.id} user={user} onSignOut={signOut} />;
 };
 
 export default Index;

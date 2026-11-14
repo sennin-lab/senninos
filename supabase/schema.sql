@@ -10,8 +10,14 @@ create table if not exists public.user_settings (
   user_id uuid primary key references auth.users (id) on delete cascade,
   wallpaper_id text not null default 'mountain' check (char_length(wallpaper_id) between 1 and 40),
   installed_apps text[] not null default '{}',
+  theme text not null default 'dark' check (theme in ('dark', 'light')),
   updated_at timestamptz not null default now()
 );
+
+-- 既に user_settings を作成済みの環境向け（何度実行しても安全）
+alter table public.user_settings add column if not exists theme text not null default 'dark';
+alter table public.user_settings drop constraint if exists user_settings_theme_check;
+alter table public.user_settings add constraint user_settings_theme_check check (theme in ('dark', 'light'));
 
 create table if not exists public.user_filesystems (
   user_id uuid primary key references auth.users (id) on delete cascade,

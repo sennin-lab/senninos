@@ -8,6 +8,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: VITE_SUPABASE_URL
+        value: https://mdsoknhzuocrgesnuhcn.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
     headers:
       - path: /*
         name: X-Content-Type-Options

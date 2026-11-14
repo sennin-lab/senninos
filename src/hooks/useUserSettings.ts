@@ -1,19 +1,22 @@
 import { useCallback, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { loadSettings, saveSettings, type UserSettings } from '@/lib/userData';
+import type { UserSettings } from '@/lib/userData';
 
-export function useUserSettings(userId: string) {
-  const [settings, setSettings] = useState<UserSettings>(() => loadSettings(userId));
+interface UseUserSettingsOptions {
+  initialSettings: UserSettings;
+  onChange: (settings: UserSettings) => void;
+}
+
+/** 設定の状態を管理し、変更を onChange（クラウド同期）へ渡します。 */
+export function useUserSettings({ initialSettings, onChange }: UseUserSettingsOptions) {
+  const [settings, setSettings] = useState<UserSettings>(initialSettings);
   const settingsRef = useRef(settings);
 
   const updateSettings = useCallback((patch: Partial<UserSettings>) => {
     const next = { ...settingsRef.current, ...patch };
     settingsRef.current = next;
     setSettings(next);
-    if (!saveSettings(userId, next)) {
-      toast.error('設定を保存できませんでした。ブラウザの空き容量を確認してください');
-    }
-  }, [userId]);
+    onChange(next);
+  }, [onChange]);
 
-  return { settings, ready: true, updateSettings };
+  return { settings, updateSettings };
 }

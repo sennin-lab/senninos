@@ -19,5 +19,15 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        // ライブラリを分けてキャッシュしやすくし、アプリ本体の更新時に再ダウンロードされる量を減らす
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          motion: ['framer-motion'],
+          supabase: ['@supabase/supabase-js'],
+        },
+      },
+    },
   },
 });

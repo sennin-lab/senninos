@@ -157,7 +157,7 @@ export default function Taskbar({ windows, apps, onOpenApp, onFocusWindow, onMin
         </motion.div>}
       </AnimatePresence>
 
-      <div className="fixed bottom-0 left-0 right-0 h-11 bg-taskbar-bg border-t border-border z-[10000] flex items-center px-2 pb-[env(safe-area-inset-bottom)]">
+      <div className="fixed bottom-0 left-0 right-0 h-11 ios-glass border-t border-border z-[10000] flex items-center px-2 pb-[env(safe-area-inset-bottom)]">
         <button
           ref={startButtonRef}
           type="button"

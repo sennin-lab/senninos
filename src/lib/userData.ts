@@ -1,4 +1,4 @@
-// ユーザーごとのデータを、このブラウザの localStorage に保存します（外部サービスは使いません）。
+// アカウントに紐づくデータの型と、読み込んだ値の検証。実際の保存・読み込みは cloudData.ts が行います。
 import type { FSNode } from '@/lib/fs';
 
 export interface UserSettings {
@@ -9,46 +9,20 @@ export interface UserSettings {
 
 export const defaultSettings: UserSettings = { wallpaperId: 'mountain', installedApps: [], theme: 'dark' };
 
-const treeKey = (userId: string) => `senninos-fs:${userId}`;
-const settingsKey = (userId: string) => `senninos-settings:${userId}`;
-
-function readStored<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** 保存できたら true。容量超過や保存領域の無効化では false。 */
-function writeStored(key: string, value: unknown): boolean {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function loadFileSystem(userId: string): FSNode | null {
-  const tree = readStored<FSNode>(treeKey(userId));
-  return tree && tree.type === 'folder' && tree.children ? tree : null;
-}
-
-export function saveFileSystem(userId: string, tree: FSNode): boolean {
-  return writeStored(treeKey(userId), tree);
-}
-
-export function loadSettings(userId: string): UserSettings {
-  const stored = readStored<Partial<UserSettings>>(settingsKey(userId));
+/** サーバーから受け取った設定を、想定どおりの形に整えます（壊れた値は既定値に戻す）。 */
+export function normalizeSettings(input: Partial<UserSettings> | null | undefined): UserSettings {
   return {
-    wallpaperId: typeof stored?.wallpaperId === 'string' ? stored.wallpaperId : defaultSettings.wallpaperId,
-    installedApps: Array.isArray(stored?.installedApps) ? stored.installedApps : defaultSettings.installedApps,
-    theme: stored?.theme === 'light' ? 'light' : 'dark',
+    wallpaperId: typeof input?.wallpaperId === 'string' && input.wallpaperId ? input.wallpaperId : defaultSettings.wallpaperId,
+    installedApps: Array.isArray(input?.installedApps)
+      ? input.installedApps.filter((id): id is string => typeof id === 'string')
+      : defaultSettings.installedApps,
+    theme: input?.theme === 'light' ? 'light' : 'dark',
   };
 }
 
-export function saveSettings(userId: string, settings: UserSettings): boolean {
-  return writeStored(settingsKey(userId), settings);
+/** フォルダー構造として使えるものだけを返します。それ以外は null。 */
+export function normalizeTree(value: unknown): FSNode | null {
+  if (!value || typeof value !== 'object') return null;
+  const node = value as FSNode;
+  return node.type === 'folder' && node.children && typeof node.children === 'object' ? node : null;
 }

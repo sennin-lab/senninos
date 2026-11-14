@@ -1,7 +1,11 @@
 # SenniNOS updates
-- [x] Username-only registration and sign-in with profiles (profiles table + trigger) and verified sessions (getUser on every session).
-- [x] Original SenniNOS logo on lock screen, sign-in, and start menu.
-- [x] Functional appearance settings (wallpaper synced to Supabase) and file import/export (Explorer upload/download).
-- [x] Tests and desktop/mobile flow verification (unit tests for file system and formula engine; end-to-end browser checks for login, apps, store, minimize, and mobile layout).
+- [x] Username-only registration and sign-in with Supabase Auth, verified sessions (getUser on startup).
+- [x] Account data (file system, wallpaper, theme, installed apps) stored in Supabase with row-level security.
+- [x] Debounced, serialized sync with on-device pending copy so unsaved changes survive closing the tab.
+- [x] File associations: .txt opens Notepad, code opens the code editor, each file in its own window.
+- [x] iOS-style glass header/taskbar, spring open/close/minimize, press feedback, reduced-motion support.
+- [x] Performance: drag and resize without re-rendering apps, lazy-loaded apps, split vendor chunks.
 - [ ] Verify sign-up on the production Supabase project with email confirmation disabled.
+- [ ] Migrate accounts and files from the old browser-only (localStorage) version.
 - [ ] Browser app: most external sites block iframe embedding; consider a server-side proxy if needed.
+- [ ] Conflict detection across devices (currently last-write-wins).

@@ -1,23 +1,25 @@
 import { useCallback, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import {
-  DEFAULT_CWD, createDefaultFS, listChildren, makeDirectoryNode, normalizePath, readFileContent,
+  DEFAULT_CWD, listChildren, makeDirectoryNode, normalizePath, readFileContent,
   removeNode, resolveNode, today, writeFileNode, type FSNode,
 } from '@/lib/fs';
-import { loadFileSystem, saveFileSystem } from '@/lib/userData';
 
-export function useVirtualFileSystem(userId: string) {
-  const [root, setRoot] = useState<FSNode>(() => loadFileSystem(userId) ?? createDefaultFS(today()));
+interface UseVirtualFileSystemOptions {
+  initialRoot: FSNode;
+  /** 変更のたびに呼ばれます（クラウド同期に使用）。 */
+  onChange: (tree: FSNode) => void;
+}
+
+export function useVirtualFileSystem({ initialRoot, onChange }: UseVirtualFileSystemOptions) {
+  const [root, setRoot] = useState<FSNode>(initialRoot);
   const [cwd, setCwd] = useState(DEFAULT_CWD);
   const rootRef = useRef(root);
 
   const commit = useCallback((next: FSNode) => {
     rootRef.current = next;
     setRoot(next);
-    if (!saveFileSystem(userId, next)) {
-      toast.error('ファイルを保存できません。ブラウザの空き容量を確認してください');
-    }
-  }, [userId]);
+    onChange(next);
+  }, [onChange]);
 
   const listDir = useCallback(
     (path?: string): FSNode[] => listChildren(rootRef.current, normalizePath(cwd, path ?? '.')),
@@ -66,8 +68,6 @@ export function useVirtualFileSystem(userId: string) {
     root,
     cwd,
     setCwd,
-    // 保存はすべて同期的に行うため、読み込み待ちの状態はありません
-    ready: true,
     listDir,
     readFile,
     writeFile,
