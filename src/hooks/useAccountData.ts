@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createAccountSyncer, fetchAccountData, type AccountData, type AccountSyncer } from '@/lib/cloudData';
+import type { AccountUser } from '@/lib/accountAuth';
 
 const SYNC_TOAST_ID = 'cloud-sync';
 
@@ -10,16 +11,16 @@ type AccountState =
   | { status: 'ready'; data: AccountData; syncer: AccountSyncer };
 
 /** サインインしたユーザーのデータを Supabase から読み込み、変更を同期します。 */
-export function useAccountData(userId: string) {
+export function useAccountData(user: AccountUser) {
   const [state, setState] = useState<AccountState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    fetchAccountData(userId)
+    fetchAccountData(user)
       .then(data => {
         if (cancelled) return;
-        const syncer = createAccountSyncer(userId, (ok, message) => {
+        const syncer = createAccountSyncer(user, (ok, message) => {
           if (ok) {
             toast.dismiss(SYNC_TOAST_ID);
           } else {
@@ -36,7 +37,7 @@ export function useAccountData(userId: string) {
     return () => {
       cancelled = true;
     };
-  }, [userId, attempt]);
+  }, [user, attempt]);
 
   const syncer = state.status === 'ready' ? state.syncer : null;
 

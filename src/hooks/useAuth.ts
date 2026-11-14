@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  authenticate, endSession, getVerifiedUser, registerAccount, toAccountUser, type AccountUser,
-} from '@/lib/accountAuth';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { authenticate, endSession, getVerifiedUser, registerAccount, type AccountUser } from '@/lib/accountAuth';
 
 type AuthResult = { error: { message: string } | null };
 type AuthState = { status: 'loading' } | { status: 'ready'; user: AccountUser | null };
@@ -11,30 +8,17 @@ const toResult = (error: unknown): AuthResult => ({
   error: { message: error instanceof Error ? error.message : 'エラーが発生しました。もう一度お試しください' },
 });
 
-/** Supabase Auth のサインイン状態を管理します。 */
+/** ユーザー名とパスワードのサインイン状態を管理します。 */
 export function useAuth() {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setState({ status: 'ready', user: null });
-      return;
-    }
     let active = true;
-
-    // 起動時はサーバーで検証してから状態を確定させる
+    // 起動時に保存済みセッションをサーバーで確認してから表示を決める
     getVerifiedUser()
       .then(user => { if (active) setState({ status: 'ready', user }); })
       .catch(() => { if (active) setState({ status: 'ready', user: null }); });
-
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      setState({ status: 'ready', user: session?.user ? toAccountUser(session.user) : null });
-    });
-    return () => {
-      active = false;
-      data.subscription.unsubscribe();
-    };
+    return () => { active = false; };
   }, []);
 
   const signIn = useCallback(async (username: string, password: string): Promise<AuthResult> => {

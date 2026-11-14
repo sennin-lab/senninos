@@ -9,7 +9,7 @@ services:
       - key: NODE_VERSION
         value: "20"
       - key: VITE_SUPABASE_URL
-        value: https://mdsoknhzuocrgesnuhcn.supabase.co
+        sync: false
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
     headers:

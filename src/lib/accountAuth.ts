@@ -1,26 +1,55 @@
-// Supabase Auth によるアカウント管理。ユーザー名とパスワードだけで登録・サインインできるよう、
-// ユーザー名から内部用のメールアドレス（<username>@ACCOUNT_EMAIL_DOMAIN）を作ります。
-// 注意: Supabase の Authentication 設定で「Confirm email」をオフにしてください（README 参照）。
-import type { User } from '@supabase/supabase-js';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+// メールアドレスを使わない、ユーザー名とパスワードのアカウント。
+// 登録・サインイン・セッション確認は Supabase 側の関数（senni_*）で行います。
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { callRpc, RpcError } from '@/lib/rpc';
 import { credentialsSchema } from '@/lib/usernameAuth';
-
-const ACCOUNT_EMAIL_DOMAIN = 'accounts.senninos.app';
 
 export interface AccountUser {
   id: string;
   username: string;
+  /** サーバーの関数を呼ぶための、セッションのトークン */
+  token: string;
 }
 
 export class AuthError extends Error {}
 
-const toEmail = (username: string) => `${username}@${ACCOUNT_EMAIL_DOMAIN}`;
-
-export function toAccountUser(user: User): AccountUser {
-  const metaName = user.user_metadata?.username;
-  const username = typeof metaName === 'string' && metaName ? metaName : (user.email?.split('@')[0] ?? 'user');
-  return { id: user.id, username };
+interface SessionPayload {
+  token: string;
+  id: string;
+  username: string;
 }
+
+const SESSION_KEY = 'senninos-session';
+
+function readSession(): AccountUser | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as Partial<AccountUser> | null;
+    if (parsed && typeof parsed.id === 'string' && typeof parsed.username === 'string' && typeof parsed.token === 'string') {
+      return { id: parsed.id, username: parsed.username, token: parsed.token };
+    }
+  } catch {
+    // 壊れたセッション情報は無視して未ログイン扱いにする
+  }
+  return null;
+}
+
+function writeSession(user: AccountUser): void {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  } catch {
+    throw new AuthError('ログイン状態を保存できません。ブラウザの保存領域を確認してください');
+  }
+}
+
+function clearSession(): void {
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // 画面上はログアウトさせる
+  }
+}
+
+const toUser = (payload: SessionPayload): AccountUser => ({ id: payload.id, username: payload.username, token: payload.token });
 
 function parseCredentials(username: string, password: string): { username: string; password: string } {
   const parsed = credentialsSchema.safeParse({ username, password });
@@ -30,66 +59,89 @@ function parseCredentials(username: string, password: string): { username: strin
 
 function ensureConfigured(): void {
   if (!isSupabaseConfigured) {
-    throw new AuthError('サーバーの設定が完了していません。VITE_SUPABASE_ANON_KEY を設定してください');
+    throw new AuthError('サーバーの設定が完了していません。VITE_SUPABASE_URL と VITE_SUPABASE_ANON_KEY を設定してください');
   }
 }
 
-function translateAuthError(message: string): string {
-  if (/invalid login credentials/i.test(message)) return 'ユーザー名またはパスワードが正しくありません';
-  if (/already (registered|been registered)|user already exists/i.test(message)) return 'このユーザー名は既に使用されています';
-  if (/rate limit|too many requests/i.test(message)) return '試行回数が多すぎます。少し時間をおいてから再度お試しください';
-  if (/failed to fetch|network|load failed/i.test(message)) return 'サーバーに接続できません。通信環境を確認してください';
-  return 'アカウントの処理に失敗しました。もう一度お試しください';
+function describeError(error: unknown): string {
+  if (!(error instanceof RpcError)) return error instanceof Error ? error.message : 'エラーが発生しました';
+  switch (error.code) {
+    case 'USERNAME_TAKEN': return 'このユーザー名は既に使用されています';
+    case 'INVALID_CREDENTIALS': return 'ユーザー名またはパスワードが正しくありません';
+    case 'INVALID_USERNAME': return 'ユーザー名は3〜24文字の半角英数字と _ で入力してください';
+    case 'WEAK_PASSWORD': return 'パスワードは8〜128文字で入力してください';
+    case 'UNAUTHORIZED': return 'セッションが切れました。再度サインインしてください';
+    case 'NOT_INSTALLED': return 'データベースの準備ができていません。supabase/schema.sql を SQL Editor で実行してください';
+    case 'BAD_KEY': return 'anon キーが正しくありません。VITE_SUPABASE_ANON_KEY を確認し、再ビルド・再デプロイしてください';
+    case 'NETWORK': return 'サーバーに接続できません。VITE_SUPABASE_URL と通信環境を確認してください';
+    default:
+      console.error('[SenniNOS auth]', error);
+      return `アカウントの処理に失敗しました: ${error.message}`;
+  }
 }
 
 /** 新しいアカウントを作成し、そのままサインインします。 */
 export async function registerAccount(username: string, password: string): Promise<AccountUser> {
   ensureConfigured();
   const creds = parseCredentials(username, password);
-  const { data, error } = await supabase.auth.signUp({
-    email: toEmail(creds.username),
-    password: creds.password,
-    options: { data: { username: creds.username } },
-  });
-  if (error) throw new AuthError(translateAuthError(error.message));
-  // 既存のメールアドレスの場合、Supabase は identities が空のユーザーを返す（情報漏えい防止の仕様）
-  if (data.user && data.user.identities?.length === 0) {
-    throw new AuthError('このユーザー名は既に使用されています');
+  try {
+    const payload = await callRpc<SessionPayload>('senni_register', { p_username: creds.username, p_password: creds.password });
+    const user = toUser(payload);
+    writeSession(user);
+    return user;
+  } catch (error) {
+    throw new AuthError(describeError(error));
   }
-  if (!data.user || !data.session) {
-    throw new AuthError('メール確認が有効になっています。Supabase の Authentication 設定で「Confirm email」をオフにしてください');
-  }
-  return toAccountUser(data.user);
 }
 
 /** ユーザー名とパスワードでサインインします。 */
 export async function authenticate(username: string, password: string): Promise<AccountUser> {
   ensureConfigured();
   const creds = parseCredentials(username, password);
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: toEmail(creds.username),
-    password: creds.password,
-  });
-  if (error || !data.user) throw new AuthError(translateAuthError(error?.message ?? ''));
-  return toAccountUser(data.user);
+  try {
+    const payload = await callRpc<SessionPayload>('senni_login', { p_username: creds.username, p_password: creds.password });
+    const user = toUser(payload);
+    writeSession(user);
+    return user;
+  } catch (error) {
+    throw new AuthError(describeError(error));
+  }
 }
 
 /**
- * 保存されているセッションをサーバーに問い合わせて検証します。
- * ローカルに残った期限切れ・失効済みのセッションは信用せず、無効なら破棄します。
+ * 保存されたセッションをサーバーに問い合わせて検証します。
+ * 期限切れや失効済みなら破棄して null を返します。通信エラーの場合は例外を投げます。
  */
 export async function getVerifiedUser(): Promise<AccountUser | null> {
   if (!isSupabaseConfigured) return null;
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session) return null;
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    await supabase.auth.signOut({ scope: 'local' });
+  const stored = readSession();
+  if (!stored) return null;
+  let me: { id: string; username: string } | null;
+  try {
+    me = await callRpc<{ id: string; username: string } | null>('senni_me', { p_token: stored.token });
+  } catch (error) {
+    if (error instanceof RpcError && error.code === 'NETWORK') throw error;
+    clearSession();
     return null;
   }
-  return toAccountUser(data.user);
+  if (!me) {
+    clearSession();
+    return null;
+  }
+  const user = { id: me.id, username: me.username, token: stored.token };
+  writeSession(user);
+  return user;
 }
 
+/** サインアウト。サーバー側のセッションも失効させます。 */
 export async function endSession(): Promise<void> {
-  await supabase.auth.signOut();
+  const stored = readSession();
+  clearSession();
+  if (stored && isSupabaseConfigured) {
+    try {
+      await callRpc('senni_logout', { p_token: stored.token });
+    } catch {
+      // ローカルは削除済み。サーバー側はセッションの期限切れで無効になる
+    }
+  }
 }

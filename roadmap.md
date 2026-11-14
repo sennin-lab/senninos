@@ -1,11 +1,12 @@
 # SenniNOS updates
-- [x] Username-only registration and sign-in with Supabase Auth, verified sessions (getUser on startup).
+- [x] Username and password accounts without email, stored in Supabase with bcrypt; sessions verified on startup.
 - [x] Account data (file system, wallpaper, theme, installed apps) stored in Supabase with row-level security.
 - [x] Debounced, serialized sync with on-device pending copy so unsaved changes survive closing the tab.
 - [x] File associations: .txt opens Notepad, code opens the code editor, each file in its own window.
 - [x] iOS-style glass header/taskbar, spring open/close/minimize, press feedback, reduced-motion support.
 - [x] Performance: drag and resize without re-rendering apps, lazy-loaded apps, split vendor chunks.
-- [ ] Verify sign-up on the production Supabase project with email confirmation disabled.
+- [ ] Verify sign-up on the production Supabase project after running schema.sql.
+- [ ] Rate-limit sign-in attempts (currently none).
 - [ ] Migrate accounts and files from the old browser-only (localStorage) version.
 - [ ] Browser app: most external sites block iframe embedding; consider a server-side proxy if needed.
 - [ ] Conflict detection across devices (currently last-write-wins).

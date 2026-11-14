@@ -12,7 +12,7 @@ interface AccountSessionProps {
 
 /** サインイン中のアカウントのデータを読み込み、準備できたらデスクトップを表示します。 */
 export default function AccountSession({ user, onSignOut }: AccountSessionProps) {
-  const { state, retry } = useAccountData(user.id);
+  const { state, retry } = useAccountData(user);
 
   if (state.status === 'loading') {
     return <BootScreen message="アカウントのデータを読み込んでいます" />;

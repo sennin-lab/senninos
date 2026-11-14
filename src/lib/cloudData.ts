@@ -1,9 +1,10 @@
-// アカウントごとのデータ（ファイル構成・設定）を Supabase と同期します。
-// - 読み込み: 初回ログイン時にサーバーから取得し、無ければ既定値を作成します。
-// - 保存: 変更はまず端末に退避し（閉じても失われないように）、少し待ってからまとめて送信します。
-// - 競合: アカウントごとに 1 端末で使う想定の last-write-wins です。
+// アカウントごとのデータ（ファイル構成・設定）を Supabase と同期します（RPC 経由）。
+// - 読み込み: サインイン時に取得。データが無ければ既定値を作成して保存します。
+// - 保存: 変更は端末に退避してから、少し待ってまとめて送信します。
+// - 競合: last-write-wins（最後に保存された内容が優先）です。
+import type { AccountUser } from '@/lib/accountAuth';
+import { callRpc } from '@/lib/rpc';
 import { createDefaultFS, today, type FSNode } from '@/lib/fs';
-import { supabase } from '@/lib/supabase';
 import { defaultSettings, normalizeSettings, normalizeTree, type UserSettings } from '@/lib/userData';
 
 export interface AccountData {
@@ -18,6 +19,13 @@ export interface AccountSyncer {
   queueSettings: (settings: UserSettings) => void;
   /** 未送信の変更をすぐに送信します（サインアウトやページを閉じる直前に使用）。 */
   flush: () => Promise<void>;
+}
+
+interface LoadedData {
+  tree: unknown;
+  wallpaperId: string;
+  installedApps: string[];
+  theme: string;
 }
 
 const DEBOUNCE_MS = 800;
@@ -38,7 +46,7 @@ function writePendingFs(userId: string, tree: FSNode): void {
   try {
     localStorage.setItem(pendingFsKey(userId), JSON.stringify(tree));
   } catch {
-    // 端末の容量が足りない場合はクラウド送信だけに頼る
+    // 端末の容量が足りない場合はサーバー送信だけに頼る
   }
 }
 
@@ -46,24 +54,15 @@ function clearPendingFs(userId: string): void {
   try {
     localStorage.removeItem(pendingFsKey(userId));
   } catch {
-    // 何もしない（次回読み込み時に同じ内容を送り直すだけ）
+    // 次回読み込み時に同じ内容を送り直すだけなので無視してよい
   }
 }
 
-function assertNoError(error: { message: string } | null): void {
-  if (error) throw new Error(error.message);
-}
+export async function fetchAccountData(user: AccountUser): Promise<AccountData> {
+  const loaded = await callRpc<LoadedData | null>('senni_load', { p_token: user.token });
 
-export async function fetchAccountData(userId: string): Promise<AccountData> {
-  const [fsResult, settingsResult] = await Promise.all([
-    supabase.from('user_filesystems').select('tree').eq('user_id', userId).maybeSingle(),
-    supabase.from('user_settings').select('wallpaper_id, installed_apps, theme').eq('user_id', userId).maybeSingle(),
-  ]);
-  assertNoError(fsResult.error);
-  assertNoError(settingsResult.error);
-
-  const pending = readPendingFs(userId);
-  const cloudTree = normalizeTree(fsResult.data?.tree);
+  const pending = readPendingFs(user.id);
+  const cloudTree = normalizeTree(loaded?.tree);
 
   let fs: FSNode;
   let needsSync = false;
@@ -78,32 +77,11 @@ export async function fetchAccountData(userId: string): Promise<AccountData> {
     needsSync = true;
   }
 
-  const row = settingsResult.data as { wallpaper_id: string; installed_apps: string[]; theme: string } | null;
-  const settings = row
-    ? normalizeSettings({ wallpaperId: row.wallpaper_id, installedApps: row.installed_apps, theme: row.theme as UserSettings['theme'] })
+  const settings = loaded
+    ? normalizeSettings({ wallpaperId: loaded.wallpaperId, installedApps: loaded.installedApps, theme: loaded.theme as UserSettings['theme'] })
     : defaultSettings;
 
   return { fs, settings, needsSync };
-}
-
-async function saveFileSystem(userId: string, tree: FSNode): Promise<void> {
-  const { error } = await supabase
-    .from('user_filesystems')
-    .upsert({ user_id: userId, tree }, { onConflict: 'user_id' });
-  assertNoError(error);
-}
-
-async function saveSettings(userId: string, settings: UserSettings): Promise<void> {
-  const { error } = await supabase.from('user_settings').upsert(
-    {
-      user_id: userId,
-      wallpaper_id: settings.wallpaperId,
-      installed_apps: settings.installedApps,
-      theme: settings.theme,
-    },
-    { onConflict: 'user_id' },
-  );
-  assertNoError(error);
 }
 
 /**
@@ -111,7 +89,7 @@ async function saveSettings(userId: string, settings: UserSettings): Promise<voi
  * 送信は直列（前の保存が終わってから次を送る）なので、古い内容で新しい内容を上書きしません。
  */
 export function createAccountSyncer(
-  userId: string,
+  user: AccountUser,
   onStatus: (ok: boolean, message?: string) => void,
 ): AccountSyncer {
   let fsVersion = 0;
@@ -136,9 +114,9 @@ export function createAccountSyncer(
     pendingFs = null;
     return enqueue(async () => {
       try {
-        await saveFileSystem(userId, snapshot.tree);
+        await callRpc('senni_save_fs', { p_token: user.token, p_tree: snapshot.tree });
         // 送信中に新しい変更が入っていなければ、端末の退避データを消す
-        if (snapshot.version === fsVersion) clearPendingFs(userId);
+        if (snapshot.version === fsVersion) clearPendingFs(user.id);
       } catch (error) {
         if (!pendingFs) pendingFs = snapshot;
         clearTimeout(fsTimer);
@@ -156,7 +134,12 @@ export function createAccountSyncer(
     pendingSettings = null;
     return enqueue(async () => {
       try {
-        await saveSettings(userId, snapshot);
+        await callRpc('senni_save_settings', {
+          p_token: user.token,
+          p_wallpaper_id: snapshot.wallpaperId,
+          p_installed_apps: snapshot.installedApps,
+          p_theme: snapshot.theme,
+        });
       } catch (error) {
         if (!pendingSettings) pendingSettings = snapshot;
         clearTimeout(settingsTimer);
@@ -170,7 +153,7 @@ export function createAccountSyncer(
     queueFileSystem(tree) {
       fsVersion += 1;
       pendingFs = { tree, version: fsVersion };
-      writePendingFs(userId, tree);
+      writePendingFs(user.id, tree);
       clearTimeout(fsTimer);
       fsTimer = setTimeout(pushFs, DEBOUNCE_MS);
     },
